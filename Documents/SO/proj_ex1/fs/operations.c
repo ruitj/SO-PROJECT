@@ -2,6 +2,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <state.h>
+
+extern inode_t inode_table[INODE_TABLE_SIZE];
 
 /* Given a path, fills pointers with strings for the parent path and child
  * file name
@@ -132,7 +135,9 @@ int create(char *name, type nodeType){
 		return FAIL;
 	}
 
+	pthread_rwlock_wrlock(&lock_1);
 	inode_get(parent_inumber, &pType, &pdata);
+	
 
 	if(pType != T_DIRECTORY) {
 		printf("failed to create %s, parent %s is not a dir\n",
@@ -147,6 +152,7 @@ int create(char *name, type nodeType){
 	}
 
 	/* create node and add entry to folder that contains new node */
+	pthread_rwlock_wrlock(&lock_1);
 	child_inumber = inode_create(nodeType);
 	if (child_inumber == FAIL) {
 		printf("failed to create %s in  %s, couldn't allocate inode\n",
@@ -160,6 +166,7 @@ int create(char *name, type nodeType){
 		return FAIL;
 	}
 
+	pthread_rwlock_unlock(&lock_1);
 	return SUCCESS;
 }
 
@@ -189,6 +196,7 @@ int delete(char *name){
 		return FAIL;
 	}
 
+	pthread_rwlock_wrlock(lock_1);
 	inode_get(parent_inumber, &pType, &pdata);
 
 	if(pType != T_DIRECTORY) {
@@ -205,6 +213,7 @@ int delete(char *name){
 		return FAIL;
 	}
 
+	pthread_rwlock_wrlock(&lock_1);
 	inode_get(child_inumber, &cType, &cdata);
 
 	if (cType == T_DIRECTORY && is_dir_empty(cdata.dirEntries) == FAIL) {
@@ -242,6 +251,8 @@ int delete(char *name){
 int lookup(char *name) {
 	char full_path[MAX_FILE_NAME];
 	char delim[] = "/";
+	
+	pthread_rwlock_t lock_1;
 
 	strcpy(full_path, name);
 
@@ -253,15 +264,22 @@ int lookup(char *name) {
 	union Data data;
 
 	/* get root inode data */
+	pthread_rwlock_rdlock(&lock_1);
 	inode_get(current_inumber, &nType, &data);
+	
 
 	char *path = strtok(full_path, delim);
 
 	/* search for all sub nodes */
 	while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
+		
 		inode_get(current_inumber, &nType, &data);
+		pthread_rwlock_rdlock(&lock_1);
+		
 		path = strtok(NULL, delim);
 	}
+	
+	pthread_rwlock_unlock(&lock_1):
 
 	return current_inumber;
 }
