@@ -1,5 +1,6 @@
 #include "operations.h"
 #include <stdlib.h>
+#include "state.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -10,6 +11,7 @@
  *  - parent: reference to a char*, to store parent path
  *  - child: reference to a char*, to store child file name
  */
+extern inode_t inode_table[INODE_TABLE_SIZE];
 void split_parent_child_from_path(char * path, char ** parent, char ** child) {
 
 	int n_slashes = 0, last_slash_location = 0;
@@ -122,8 +124,9 @@ int create(char *name, type nodeType){
 	union Data pdata;
 
 	strcpy(name_copy, name);
+	//PATH POSSIBLE LOCK
 	split_parent_child_from_path(name_copy, &parent_name, &child_name);
-
+	// possible lock
 	parent_inumber = lookup(parent_name);
 
 	if (parent_inumber == FAIL) {
@@ -139,7 +142,7 @@ int create(char *name, type nodeType){
 		        name, parent_name);
 		return FAIL;
 	}
-
+	//possible lock
 	if (lookup_sub_node(child_name, pdata.dirEntries) != FAIL) {
 		printf("failed to create %s, already exists in dir %s\n",
 		       child_name, parent_name);
@@ -153,7 +156,7 @@ int create(char *name, type nodeType){
 		        child_name, parent_name);
 		return FAIL;
 	}
-
+	//possible lock
 	if (dir_add_entry(parent_inumber, child_inumber, child_name) == FAIL) {
 		printf("could not add entry %s in dir %s\n",
 		       child_name, parent_name);
@@ -177,10 +180,10 @@ int delete(char *name){
 	/* use for copy */
 	type pType, cType;
 	union Data pdata, cdata;
-
+	//possible lock
 	strcpy(name_copy, name);
 	split_parent_child_from_path(name_copy, &parent_name, &child_name);
-
+	//possible lock
 	parent_inumber = lookup(parent_name);
 
 	if (parent_inumber == FAIL) {
@@ -196,7 +199,7 @@ int delete(char *name){
 		        child_name, parent_name);
 		return FAIL;
 	}
-
+	//possible lock
 	child_inumber = lookup_sub_node(child_name, pdata.dirEntries);
 
 	if (child_inumber == FAIL) {

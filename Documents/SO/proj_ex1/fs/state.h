@@ -37,8 +37,8 @@ union Data {
 /*
  * I-node definition
  */
-typedef struct inode_t {    
-	type nodeType;
+typedef struct inode_t {                 
+	type nodeType;                        
 	union Data data;
     /* more i-node attributes will be added in future exercises */
 } inode_t;
