@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include "state.h"
+#include "state.h" dfsf
 #include <pthread.h>
 
 extern inode_t inode_table[INODE_TABLE_SIZE];

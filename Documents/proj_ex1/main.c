@@ -10,13 +10,18 @@
 #define MAX_COMMANDS 150000
 #define MAX_INPUT_SIZE 100
 #define MAX_THREADS 100
+#define mutex "mutex"
+#define read "read"
+#define write "write"
+#define rwlock "rwlock"
+#define nosync "nosync"
 int numberThreads = 0;
 char inputCommands[MAX_COMMANDS][MAX_INPUT_SIZE];
 int numberCommands = 0;
 int headQueue = 0;
-char mutex[6]="mutex",read[5]="read",write[6]="write",rwlock[7]="rwlock",nosync[7]="nosync";
+
 pthread_mutex_t lock;
-pthread_rwlock_t lock_1;
+pthread_rwlock_t lock_rw;
 int insertCommand(char* data) {
     
     if(numberCommands != MAX_COMMANDS) {
@@ -26,49 +31,57 @@ int insertCommand(char* data) {
 
     return 0;
 }
-void locking(pthread_mutex_t lock,pthread_rwlock_t lock_1,char* strategy,char* Acess_type){
+void locking(pthread_mutex_t* lock,pthread_rwlock_t* lock_rw,char* strategy,char* Acess_type){
 	if (strcmp(strategy,mutex)==0){
-		pthread_mutex_lock(&lock);
+		pthread_mutex_lock(lock);
         return;
 	}
 
 	if((strcmp(Acess_type,read)==0)&&(strcmp(strategy,rwlock)==0)) {
-
-		pthread_rwlock_rdlock(&lock_1);
+		pthread_rwlock_rdlock(lock_rw);
 		return;
 	}
 	if((strcmp(Acess_type,write)==0)&&(strcmp(strategy,rwlock)==0)) {
-		pthread_rwlock_wrlock(&lock_1);
+		pthread_rwlock_wrlock(lock_rw);
 		return;
 	}
     if(strcmp(strategy,nosync)==0){
         return;
     }
+    else{
+        fprintf(stderr, "%s", "LOCKING ERROR\n");
+        exit(EXIT_FAILURE);
+    }
 }
-void unlocking(pthread_mutex_t lock,pthread_rwlock_t lock_1,char* strategy){
+void unlocking(pthread_mutex_t* lock,pthread_rwlock_t* lock_rw,char* strategy){
 	if (strcmp(strategy,mutex)==0){
-		pthread_mutex_unlock(&lock);
+		pthread_mutex_unlock(lock);
+        return;
 	}
 
 	if(strcmp(strategy,rwlock)==0){
-		pthread_rwlock_unlock(&lock_1);
+		pthread_rwlock_unlock(lock_rw);
 		return;
 	}
     if(strcmp(strategy,nosync)==0){
         return;
     }
-	
+	else{
+        fprintf(stderr, "%s", "UNLOCKING ERROR\n");
+        exit(EXIT_FAILURE);
+    }
 }
 
 char* removeCommand(pthread_mutex_t lock,char* strategy,char* acess) {
     //pthread_mutex_lock(&lock);
-    locking(lock,lock_1,strategy,"write");
+    locking(&lock,&lock_rw,strategy,"write");
     if(numberCommands > 0){
         numberCommands--;
-        unlocking(lock,lock_1,strategy);
-        return inputCommands[headQueue++];  
+        headQueue++;
+        unlocking(&lock,&lock_rw,strategy);
+        return inputCommands[headQueue];  
     }
-    unlocking(lock,lock_1,strategy);
+    unlocking(&lock,&lock_rw,strategy);
     return NULL;
 }
 
@@ -188,35 +201,40 @@ int main(int argc, char* argv[]) {
     char strategy[7];
     FILE *outputfile;
     pthread_t tid[MAX_THREADS];
+    if (argv[5]){
+        fprintf(stderr,"FAILURE: MORE THAN THREE ARGUMENTS\n");
+        exit(EXIT_FAILURE);
+    }
     init_fs();
     strcpy(strategy,argv[4]);
     /* process input and print tree */
     processInput(argv[1]);
     // nosync e nr de threads superior a 1 -> erro
+    if(threads<0){
+        fprintf(stderr,"THREAD VALUES ARE NOT VALID\n");
+        exit(EXIT_FAILURE);
+    }
     if  ((strcmp(strategy,nosync)==0)&&(threads>1)) {
-        printf("ONLY ONE THREAD ALLOWED ON NOSYNC STRATEGY\n");
+        fprintf(stderr,"ONLY ONE THREAD ALLOWED ON NOSYNC STRATEGY\n");
         exit(EXIT_FAILURE);
     }
     if ((strcmp(strategy,mutex)==0)||(strcmp(strategy,rwlock)==0)) {
         pthread_mutex_init(&lock, NULL);
         gettimeofday(&t1,NULL);
         for(i=0;i<threads;i++){
-            if(pthread_create(&tid[i],NULL,applyCommands,strategy)==0){
-                
-            }
-            else{
+            if(pthread_create(&tid[i],NULL,applyCommands,strategy)!=0){
+                fprintf(stderr,"PTHREAD CREATE FAILURE");
                 exit(EXIT_FAILURE);
-                }
             }
+        }
 
         for(i=0;i<threads;i++){
-            if (pthread_join(tid[i],NULL)==0){
-                    }
-            else{
+            if (pthread_join(tid[i],NULL)!=0){
                 exit(EXIT_FAILURE);
-                    }
             }
+        }
     }
+
     else{
         gettimeofday(&t1,NULL);
         applyCommands(strategy);
