@@ -14,7 +14,9 @@ extern inode_t inode_table[INODE_TABLE_SIZE];
  *  - parent: reference to a char*, to store parent path
  *  - child: reference to a char*, to store child file name
  */
+
 pthread_rwlock_t lock;
+
 void split_parent_child_from_path(char * path, char ** parent, char ** child) {
 
 	int n_slashes = 0, last_slash_location = 0;
@@ -45,11 +47,12 @@ void split_parent_child_from_path(char * path, char ** parent, char ** child) {
 
 }
 
-
 /*
  * Initializes tecnicofs and creates root node.
  */
+
 void init_fs() {
+	
 	inode_table_init();
 	
 	/* create root inode */
@@ -65,6 +68,7 @@ void init_fs() {
 /*
  * Destroy tecnicofs and inode table.
  */
+
 void destroy_fs() {
 	inode_table_destroy();
 }
@@ -99,6 +103,7 @@ int is_dir_empty(DirEntry *dirEntries) {
  *  - inumber: found node's inumber
  *  - FAIL: if not found
  */
+
 int lookup_sub_node(char *name, DirEntry *entries) {
 	if (entries == NULL) {
 		return FAIL;
@@ -119,6 +124,7 @@ int lookup_sub_node(char *name, DirEntry *entries) {
  *  - nodeType: type of node
  * Returns: SUCCESS or FAIL
  */
+
 int create(char *name, type nodeType){
 
 	int parent_inumber, child_inumber;
@@ -130,7 +136,9 @@ int create(char *name, type nodeType){
 	strcpy(name_copy, name);
 	split_parent_child_from_path(name_copy, &parent_name, &child_name);
 	parent_inumber = lookup(parent_name);
-	pthread_rwlock_unlock(&inode_table[parent_inumber].lock);
+	
+	pthread_rwlock_unlock(&inode_table[parent_inumber].lock); //este unlock vem de onde?
+	
 	if (parent_inumber == FAIL) {
 		printf("failed to create %s, invalid parent dir %s\n",
 		        name, parent_name);
@@ -176,6 +184,7 @@ int create(char *name, type nodeType){
  *  - name: path of node
  * Returns: SUCCESS or FAIL
  */
+
 int delete(char *name){
 
 	int parent_inumber, child_inumber;
@@ -281,6 +290,7 @@ int lookup(char *name) {
  * Input:
  *  - fp: pointer to output file
  */
+
 void print_tecnicofs_tree(FILE *fp){
 	inode_print_tree(fp, FS_ROOT, "");
 }
