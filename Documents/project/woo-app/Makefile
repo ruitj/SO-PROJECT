@@ -1,0 +1,9 @@
+JAVADIR=/usr/share/java
+JARNAME=woo-app
+
+all:
+	(cd src; javac -cp /home/tenjas/project/po-uuilib/po-uuilib.jar:/home/tenjas/project/woo-core/woo-core.jar -encoding UTF-8 `find . -name \*.java`)
+	(cd src; jar cvf ../$(JARNAME).jar `find . -name \*.class -o -name \*.java` )
+
+clean:
+	$(RM) $(JARNAME).jar `find . -name \*.class`
