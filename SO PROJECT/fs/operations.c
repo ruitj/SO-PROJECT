@@ -108,12 +108,10 @@ int lookup_sub_node(char *name, DirEntry *entries) {
 		return FAIL;
 	}
 	for (int i = 0; i < MAX_DIR_ENTRIES; i++) {
-		//pthread_rwlock_rdlock(&entries[i].trinco);
-        if (entries[i].inumber != FREE_INODE && strcmp(entries[i].name, name) == 0) {
-            //pthread_rwlock_unlock(&entries[i].trinco);
+		
+        if (entries[i].inumber != FREE_INODE && strcmp(entries[i].name, name) == 0) {     
 			return entries[i].inumber;
         }
-		//pthread_rwlock_unlock(&entries[i].trinco);
     }
 	return FAIL;
 }
@@ -128,10 +126,9 @@ int lookup_sub_node(char *name, DirEntry *entries) {
  */
 
 int create(char *name,type nodeType,int inode_index[]){
-
-	int parent_inumber, child_inumber,parent_child;
-	char *parent_name,parent_copy[MAX_FILE_NAME],*child_name, name_copy[MAX_FILE_NAME],new_path[MAX_FILE_NAME],*parent_name_parent,*parent_name_child;
-	int i=0,unlocked=1;                            // passar o vetor como referencia
+	int parent_inumber, child_inumber;
+	char *parent_name,parent_copy[MAX_FILE_NAME],unlock_path[MAX_FILE_NAME],*child_name, name_copy[MAX_FILE_NAME],new_path[MAX_FILE_NAME],*parent_name_parent,*parent_name_child;
+	int i=0;                            // passar o vetor como referencia
 	char delim[] = "/",*saveptr;
 	/* use for copy */
 	type pType;
@@ -148,54 +145,48 @@ int create(char *name,type nodeType,int inode_index[]){
 	parent_inumber = lookup(parent_name,inode_index,i,0);
 	child_inumber = inode_create(nodeType);
 	
-	pthread_rwlock_trywrlock(&inode_table[child_inumber].lock);
-	
-	if(strlen(parent_name)>0){
+
+
+
 	strcpy(parent_copy, parent_name);  
 	split_parent_child_from_path(parent_copy,&parent_name_parent,&parent_name_child);
 	strcpy(new_path,name);
-	//puts(parent_name_child);
-	inode_get(current_inumber, &nType, &data);
-
-	//pthread_rwlock_rdlock(&inode_table[child_inumber].lock);
-	//pthread_rwlock_rdlock(&inode_table[parent_inumber].lock);
-	char *path = strtok_r(new_path,delim,&saveptr);
-	while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
-		if(strcmp(path,parent_name_child)==0){
-			for(int j=0;j<INODE_TABLE_SIZE;j++){
-				if(inode_index[j]==current_inumber){
-					unlocked=0;
-					break;
-				}
-			}
-		if(unlocked==1){
-			puts("here");	
-			pthread_rwlock_trywrlock(&inode_table[current_inumber].lock);
-			inode_index[++i]=current_inumber;
-			continue;
-			}
-		}
-	pthread_rwlock_rdlock(&inode_table[current_inumber].lock);
-	inode_index[++i]=current_inumber;
-	inode_get(current_inumber, &nType, &data);
-	path = strtok_r(NULL, delim,&saveptr);
-	}
-	parent_child = lookup(parent_name_child,inode_index,i,0);	
 	
-	if (parent_inumber == FAIL) {
+	if (strlen(parent_name)==0){
+		pthread_rwlock_wrlock(&inode_table[FS_ROOT].lock);
+	}
+	
+	
+
+	if (parent_inumber== FAIL) {
 		printf("failed to create %s, invalid parent dir %s\n",
 		        name, parent_name);
 				if(parent_inumber==0){		 
 					pthread_rwlock_unlock(&inode_table[FS_ROOT].lock);
+
 					pthread_rwlock_unlock(&inode_table[child_inumber].lock);
 					}
 				else{
-					
-					unlock_nodes(inode_table,i,inode_index);
+					puts("maybe");
+					strcpy(new_path,name);
+					char *path = strtok_r(new_path, delim,&saveptr);
+					while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
+						for(i=0;i<INODE_TABLE_SIZE;i++){
+							if (inode_index[i]==current_inumber){
+								pthread_rwlock_unlock(&inode_table[i].lock);
+								inode_index[i]=-1;
+								break;
+							}
+						}
+						inode_get(current_inumber, &nType, &data);
+						path = strtok_r(NULL, delim,&saveptr);
+					}
 					}
 				
 		return FAIL;
 	}
+	//pthread_rwlock_wrlock(&inode_table[parent_inumber].lock);	
+	//pthread_rwlock_wrlock(&inode_table[child_inumber].lock);
 	inode_get(parent_inumber, &pType, &pdata);
 	if(pType != T_DIRECTORY) {
 		printf("failed to create %s, parent %s is not a dir\n",
@@ -206,19 +197,22 @@ int create(char *name,type nodeType,int inode_index[]){
 					}
 				else{
 					
-					unlock_nodes(inode_table,i,inode_index);
+					strcpy(unlock_path,name);
+					char *path = strtok_r(unlock_path, delim,&saveptr);
+					while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
+						for(i=0;i<INODE_TABLE_SIZE;i++){
+							if (inode_index[i]==current_inumber){
+								pthread_rwlock_unlock(&inode_table[i].lock);
+								inode_index[i]=-1;
+								break;
+							}
+						}
+						inode_get(current_inumber, &nType, &data);
+						path = strtok_r(NULL, delim,&saveptr);
 					}
-
+				}
 			return FAIL;
-		}
 	}
-	if(strlen(parent_name)==0){
-		//pthread_rwlock_trywrlock(&inode_table[FS_ROOT].lock);
-		//pthread_rwlock_wrlock(&inode_table[FS_ROOT].lock);
-		pthread_rwlock_rdlock(&inode_table[child_inumber].lock);
-		
-	}
-
 	if (lookup_sub_node(child_name, pdata.dirEntries) != FAIL) {
 		printf("failed to create %s, already exists in dir %s\n",
 		       child_name, parent_name);
@@ -227,14 +221,27 @@ int create(char *name,type nodeType,int inode_index[]){
 					pthread_rwlock_unlock(&inode_table[child_inumber].lock);
 					}
 				else{
-					unlock_nodes(inode_table,i,inode_index);
+					puts("maybe");
+					strcpy(unlock_path,name);
+					char *path = strtok_r(unlock_path, delim,&saveptr);
+					while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
+						for(i=0;i<INODE_TABLE_SIZE;i++){
+							if (inode_index[i]==current_inumber){
+								pthread_rwlock_unlock(&inode_table[i].lock);
+								inode_index[i]=-1;
+								break;
+							}
+						}
+						inode_get(current_inumber, &nType, &data);
+						path = strtok_r(NULL, delim,&saveptr);
 					
 					}
-			
+				}
 		return FAIL;
 	}
 	/* create node and add entry to folder that contains new node */
 	if (child_inumber == FAIL) {
+
 		printf("failed to create %s in  %s, couldn't allocate inode\n",
 		        child_name, parent_name);
 				if(parent_inumber==0){
@@ -242,10 +249,22 @@ int create(char *name,type nodeType,int inode_index[]){
 					pthread_rwlock_unlock(&inode_table[child_inumber].lock);
 					}
 				else{
-					unlock_nodes(inode_table,i,inode_index);
+					puts("maybe");
+					strcpy(unlock_path,name);
+					char *path = strtok_r(unlock_path, delim,&saveptr);
+					while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
+						for(i=0;i<INODE_TABLE_SIZE;i++){
+							if (inode_index[i]==current_inumber){
+								pthread_rwlock_unlock(&inode_table[i].lock);
+								inode_index[i]=-1;
+								break;
+							}
+						}
+						inode_get(current_inumber, &nType, &data);
+						path = strtok_r(NULL, delim,&saveptr);
 					
 					}
-				
+				}
 		return FAIL;
 	}
 	if (dir_add_entry(parent_inumber, child_inumber, child_name) == FAIL) {
@@ -256,10 +275,25 @@ int create(char *name,type nodeType,int inode_index[]){
 					pthread_rwlock_unlock(&inode_table[child_inumber].lock);
 					}
 				else{
-					unlock_nodes(inode_table,i,inode_index);
+					puts("maybe");
+					strcpy(unlock_path,name);
+					char *path = strtok_r(unlock_path, delim,&saveptr);
+					while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
+						for(i=0;i<INODE_TABLE_SIZE;i++){
+							if (inode_index[i]==current_inumber){
+								pthread_rwlock_unlock(&inode_table[i].lock);
+								inode_index[i]=-1;
+								break;
+							}
+						}
+						inode_get(current_inumber, &nType, &data);
+						path = strtok_r(NULL, delim,&saveptr);
 					
 					}
+				}
 				return FAIL;
+			
+
 	}	
 		if(parent_inumber==0){
 			//puts("finally");
@@ -268,12 +302,26 @@ int create(char *name,type nodeType,int inode_index[]){
 			return SUCCESS;
 			}
 		else{
-			unlock_nodes(inode_table,i,inode_index);
+			strcpy(unlock_path,name);
+					char *path = strtok_r(unlock_path, delim,&saveptr);
+					while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
+						printf("path=%s",path);
+						for(i=0;i<INODE_TABLE_SIZE;i++){
+							if (inode_index[i]==current_inumber){
+								printf("inode=%d",inode_index[i]);
+								pthread_rwlock_unlock(&inode_table[i].lock);
+								inode_index[i]=-1;
+								break;
+							}
+						}
+						inode_get(current_inumber, &nType, &data);
+						path = strtok_r(NULL, delim,&saveptr);
+					}
 			return SUCCESS;
-			}
 
 }
-               
+	}
+  
 /*
  * Deletes a node given a path.
  * Input:
@@ -284,7 +332,7 @@ int create(char *name,type nodeType,int inode_index[]){
 int delete(char *name,int inode_index []){
 
 	int parent_inumber, child_inumber;
-	char *parent_name, *child_name, name_copy[MAX_FILE_NAME],new_path[MAX_FILE_NAME],*parent_name_parent,*parent_name_child;
+	char *parent_name,parent_copy[MAX_FILE_NAME],unlock_path[MAX_FILE_NAME],*child_name, name_copy[MAX_FILE_NAME],new_path[MAX_FILE_NAME],*parent_name_parent,*parent_name_child;
 	int i=0;
 	char delim[] = "/",*saveptr;
 	/* use for copy */
@@ -295,59 +343,107 @@ int delete(char *name,int inode_index []){
 	union Data data;
 	int current_inumber = FS_ROOT;
 	strcpy(name_copy, name);
-	
+
 	split_parent_child_from_path(name_copy, &parent_name, &child_name);
-	
 	parent_inumber = lookup(parent_name,inode_index,i,0);
+	pthread_rwlock_trywrlock(&inode_table[parent_inumber].lock);
 	
+	strcpy(parent_copy, parent_name);  
+	split_parent_child_from_path(parent_copy,&parent_name_parent,&parent_name_child);
+	strcpy(new_path,name);
+	inode_get(parent_inumber, &pType, &pdata);
+	child_inumber = lookup_sub_node(child_name, pdata.dirEntries);
+
+
 	if (parent_inumber == FAIL) {
 		printf("failed to delete %s, invalid parent dir %s\n",
 		        child_name, parent_name);
-					unlock_nodes(inode_table,i,inode_index);
-					
-					}
-		return FAIL;
+					if(parent_inumber==0){		 
+					pthread_rwlock_unlock(&inode_table[FS_ROOT].lock);
 
-	strcpy(new_path,parent_name);
-	if(strlen(parent_name)==0) {
-		pthread_rwlock_trywrlock(&inode_table[FS_ROOT].lock);
-	}  
-	else
-	{	
-		split_parent_child_from_path(new_path,&parent_name_parent,&parent_name_child);
-		strcpy(new_path,parent_name);
-		inode_get(current_inumber, &nType, &data);
-		char *path = strtok_r(new_path,delim,&saveptr);
-		
-		while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
-		path = strtok_r(NULL, delim,&saveptr);
-		pthread_rwlock_rdlock(&inode_table[current_inumber].lock);
-		inode_get(current_inumber, &nType, &data);
-			if(strcmp(new_path,parent_name_child)==0){
-				pthread_rwlock_trywrlock(&inode_table[current_inumber].lock);
-				}
-		inode_index[++i]=current_inumber;
-			}
-		}
-	
+					pthread_rwlock_unlock(&inode_table[child_inumber].lock);
+					}
+				else{
+					strcpy(unlock_path, name);
+				
+					pthread_rwlock_unlock(&inode_table[parent_inumber].lock);
+					char *path = strtok_r(unlock_path, delim,&saveptr);
+					while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
+						for(i=0;i<INODE_TABLE_SIZE;i++){
+							if (inode_index[i]==current_inumber){
+								printf("inode=%d",inode_index[i]);
+								pthread_rwlock_unlock(&inode_table[i].lock);
+								inode_index[i]=-1;
+								break;
+							}
+						}
+						inode_get(current_inumber, &nType, &data);
+						path = strtok_r(NULL, delim,&saveptr);
+					}
+					}
+					return FAIL;
+					}
+	pthread_rwlock_trywrlock(&inode_table[child_inumber].lock);	
+
+
 	inode_get(parent_inumber, &pType, &pdata);
 
 	if(pType != T_DIRECTORY) {
 		printf("failed to delete %s, parent %s is not a dir\n",
 		        child_name, parent_name);
+				if(parent_inumber==0){		 
+					pthread_rwlock_unlock(&inode_table[FS_ROOT].lock);
+
+					pthread_rwlock_unlock(&inode_table[child_inumber].lock);
+					}
+				else{
+					
+					strcpy(unlock_path, name);
+					
+					char *path = strtok_r(unlock_path, delim,&saveptr);
+					while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
+						for(i=0;i<INODE_TABLE_SIZE;i++){
+							if (inode_index[i]==current_inumber){
+								printf("inode=%d",inode_index[i]);
+								pthread_rwlock_unlock(&inode_table[i].lock);
+								inode_index[i]=-1;
+								break;
+							}
+						}
+						inode_get(current_inumber, &nType, &data);
+						path = strtok_r(NULL, delim,&saveptr);
+					}
+					}
 		return FAIL;
 	}
 
-	child_inumber = lookup_sub_node(child_name, pdata.dirEntries);
-
 	if (child_inumber == FAIL) {
+		puts(name);
 		printf("could not delete %s, does not exist in dir %s\n",
 		       name, parent_name);
-			   if(parent_inumber==0){
-					pthread_rwlock_unlock(&inode_table[parent_inumber].lock);
+			   if(parent_inumber==0){		 
+					pthread_rwlock_unlock(&inode_table[FS_ROOT].lock);
+
+					pthread_rwlock_unlock(&inode_table[child_inumber].lock);
 					}
 				else{
-					unlock_nodes(inode_table,i,inode_index);
+					
+					
+					strcpy(unlock_path, name);
+					
+					char *path = strtok_r(unlock_path, delim,&saveptr);
+					while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
+						for(i=0;i<INODE_TABLE_SIZE;i++){
+							if (inode_index[i]==current_inumber){
+								printf("inode=%d",inode_index[i]);
+								pthread_rwlock_unlock(&inode_table[i].lock);
+								inode_index[i]=-1;
+								break;
+							}
+						}
+						inode_get(current_inumber, &nType, &data);
+						path = strtok_r(NULL, delim,&saveptr);
+					}
 					
 					}
 		return FAIL;
@@ -358,12 +454,28 @@ int delete(char *name,int inode_index []){
 	if (cType == T_DIRECTORY && is_dir_empty(cdata.dirEntries) == FAIL) {
 		printf("could not delete %s: is a directory and not empty\n",
 		       name);
-			   if(parent_inumber==0){
-					pthread_rwlock_unlock(&inode_table[parent_inumber].lock);
+			   if(parent_inumber==0){		 
+					pthread_rwlock_unlock(&inode_table[FS_ROOT].lock);
+
+					pthread_rwlock_unlock(&inode_table[child_inumber].lock);
 					}
 				else{
-					unlock_nodes(inode_table,i,inode_index);
 					
+					strcpy(unlock_path, name);
+					
+					char *path = strtok_r(unlock_path, delim,&saveptr);
+					while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
+						for(i=0;i<INODE_TABLE_SIZE;i++){
+							if (inode_index[i]==current_inumber){
+								printf("inode=%d",inode_index[i]);
+								pthread_rwlock_unlock(&inode_table[i].lock);
+								inode_index[i]=-1;
+								break;
+							}
+						}
+						inode_get(current_inumber, &nType, &data);
+						path = strtok_r(NULL, delim,&saveptr);
+					}
 					}
 		return FAIL;
 	}
@@ -372,12 +484,28 @@ int delete(char *name,int inode_index []){
 	if (dir_reset_entry(parent_inumber, child_inumber) == FAIL) {
 		printf("failed to delete %s from dir %s\n",
 		       child_name, parent_name);
-			   if(parent_inumber==0){
-					pthread_rwlock_unlock(&inode_table[parent_inumber].lock);
+			   if(parent_inumber==0){		 
+					pthread_rwlock_unlock(&inode_table[FS_ROOT].lock);
+
+					pthread_rwlock_unlock(&inode_table[child_inumber].lock);
 					}
 				else{
-					unlock_nodes(inode_table,i,inode_index);
 					
+					strcpy(unlock_path, name);
+					
+					char *path = strtok_r(unlock_path, delim,&saveptr);
+					while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
+						for(i=0;i<INODE_TABLE_SIZE;i++){
+							if (inode_index[i]==current_inumber){
+								printf("inode=%d",inode_index[i]);
+								pthread_rwlock_unlock(&inode_table[i].lock);
+								inode_index[i]=-1;
+								break;
+							}
+						}
+						inode_get(current_inumber, &nType, &data);
+						path = strtok_r(NULL, delim,&saveptr);
+					}
 					}
 		return FAIL;
 	}
@@ -385,22 +513,52 @@ int delete(char *name,int inode_index []){
 	if (inode_delete(child_inumber) == FAIL) {
 		printf("could not delete inode number %d from dir %s\n",
 		       child_inumber, parent_name);
-			   if(parent_inumber==0){
-					pthread_rwlock_unlock(&inode_table[parent_inumber].lock);
+			   if(parent_inumber==0){		 
+					pthread_rwlock_unlock(&inode_table[FS_ROOT].lock);
+
+					pthread_rwlock_unlock(&inode_table[child_inumber].lock);
 					}
 				else{
-					unlock_nodes(inode_table,i,inode_index);
 					
+					strcpy(unlock_path, name);
+					char *path = strtok_r(unlock_path, delim,&saveptr);
+					while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
+						for(i=0;i<INODE_TABLE_SIZE;i++){
+							if (inode_index[i]==current_inumber){
+								printf("inode=%d",inode_index[i]);
+								pthread_rwlock_unlock(&inode_table[i].lock);
+								inode_index[i]=-1;
+								break;
+							}
+						}
+						inode_get(current_inumber, &nType, &data);
+						path = strtok_r(NULL, delim,&saveptr);
+					}
 					}
 		return FAIL;
 	}
 
-	if(parent_inumber==0){
-					pthread_rwlock_unlock(&inode_table[parent_inumber].lock);
+	if(parent_inumber==0){		 
+					pthread_rwlock_unlock(&inode_table[FS_ROOT].lock);
+
+					pthread_rwlock_unlock(&inode_table[child_inumber].lock);
 					}
 				else{
-					unlock_nodes(inode_table,i,inode_index);
 					
+					strcpy(unlock_path, name);
+					char *path = strtok_r(unlock_path, delim,&saveptr);
+					while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
+						for(i=0;i<INODE_TABLE_SIZE;i++){
+							if (inode_index[i]==current_inumber){
+								printf("good delete inode=%d",inode_index[i]);
+								pthread_rwlock_unlock(&inode_table[i].lock);
+								inode_index[i]=-1;
+								break;
+							}
+						}
+						inode_get(current_inumber, &nType, &data);
+						path = strtok_r(NULL, delim,&saveptr);
+					}
 					}
 	return SUCCESS;
 }
@@ -409,7 +567,7 @@ void unlock_nodes(inode_t* inode_table,int max,int inode_index[]){
 	for(j=max;j<0;j--){
 		k=inode_index[j];
 		pthread_rwlock_unlock(&inode_table[k].lock);
-		inode_index[j]=-3;
+		inode_index[j]=-1;
 	}
 }
 
@@ -424,13 +582,12 @@ void unlock_nodes(inode_t* inode_table,int max,int inode_index[]){
  */
 
 int lookup(char *name,int inode_index[],int i,int is_read) {   // alterar a variavel i       
-	char full_path[MAX_FILE_NAME];                             // passar o vetor como referencia
+	char full_path[MAX_FILE_NAME],*parent,*child;                             // passar o vetor como referencia
 	char delim[] = "/",*saveptr;
-	int k,j,is_active=0,unlocked=1;
+	int k,j,l,is_active=0,unlocked=1;
 	strcpy(full_path, name);
 	/* start at root node */
 	int current_inumber = FS_ROOT,helper=0;
-
 	/* use for copy */
 	type nType;
 	union Data data;
@@ -442,33 +599,64 @@ int lookup(char *name,int inode_index[],int i,int is_read) {   // alterar a vari
 	if (strlen(name)==0){
 		return FS_ROOT;
 	}
+	if (strlen(name)==1){
+		current_inumber = lookup_sub_node(name, data.dirEntries);
+		return current_inumber;
+	}
+	split_parent_child_from_path(name,&parent,&child);
 	char *path = strtok_r(full_path, delim,&saveptr);
+	printf("path=%s\n",path);
 	while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
-		
-		//printf("path=%s\n",path);
-		is_active=1;
+		//printf("child=%s\n",child);
+		if(strcmp(path,child)==0){
 			for(int j=0;j<INODE_TABLE_SIZE;j++){
 				if(inode_index[j]==current_inumber){
 					unlocked=0;
 					break;
 				}
 			}
-			if(unlocked==1){
-				//printf("path=%s\n",path);
-				pthread_rwlock_rdlock(&inode_table[current_inumber].lock);
-				inode_index[++i]=current_inumber;
-				helper++;
+		if((unlocked==1)&&(is_read==0)){
+			is_active=1;
+			pthread_rwlock_trywrlock(&inode_table[current_inumber].lock);
+			for(int i=0;i<INODE_TABLE_SIZE;i++){
+				if (inode_index[i]==-1){
+					inode_index[i]=current_inumber;
+					break;
+					}
+				}
+			break;
+		}
+		else if ((unlocked==1)&&(is_read==1)){
+			is_active=1;
+			
+			pthread_rwlock_tryrdlock(&inode_table[current_inumber].lock);
+			for(int i=0;i<INODE_TABLE_SIZE;i++){
+				if (inode_index[i]==-1){
+					inode_index[i]=current_inumber;
+					break;
+					}
+				}
+			helper++;
+			break;
+		}
+		else if(unlocked==0){
+			break;
 			}
+		}
+			
 		inode_get(current_inumber, &nType, &data);
 		path = strtok_r(NULL, delim,&saveptr);
 	}
-	
+	l=i;
 		while((helper-->0)&&(is_active==1)&&(is_read==1)) {
 		k=i--;
-		j=inode_index[k];	
+		j=inode_index[k];
+		if(j>0){	
 		pthread_rwlock_unlock(&inode_table[j].lock);
 		inode_index[k]=-1;		
+			}
 		}
+		i=l;
 	return current_inumber;	
 }
 

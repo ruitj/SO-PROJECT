@@ -100,9 +100,15 @@ void processInput(char* ficheiro){
 
 
 void *applyCommands(){
-    int inode_index[INODE_TABLE_SIZE]={-1},i=0;
+    int inode_index[INODE_TABLE_SIZE],i=0;
+    for(int i=0;i<50;i++){
+		inode_index[i]=-1;
+	}
+    i=0;
     while (numberCommands > 0){
+        pthread_rwlock_wrlock(&lock_rw);
         const char* command = removeCommand();
+        pthread_rwlock_unlock(&lock_rw);
         //printf("%s",command);
         
         if (command == NULL){
@@ -160,7 +166,6 @@ void *applyCommands(){
             }
         }
     }
-    
     return NULL;
 }
 
