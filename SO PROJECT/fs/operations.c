@@ -4,7 +4,14 @@
 #include <string.h>
 #include "state.h"
 #include <pthread.h>
-
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <stdlib.h>
+#include <strings.h>
+#include <sys/uio.h>
+#include <unistd.h>
+#include <sys/stat.h>
 extern inode_t inode_table[INODE_TABLE_SIZE];
 
 /* Given a path, fills pointers with strings for the parent path and child
@@ -49,7 +56,17 @@ void split_parent_child_from_path(char * path, char ** parent, char ** child) {
 /*
  * Initializes tecnicofs and creates root node.
  */
+int setSockAddrUn(char *path, struct sockaddr_un *addr) {
 
+  if (addr == NULL)
+    return 0;
+
+  bzero((char *)addr, sizeof(struct sockaddr_un));
+  addr->sun_family = AF_UNIX;
+  strcpy(addr->sun_path, path);
+
+  return SUN_LEN(addr);
+}
 void init_fs() {
 	
 	inode_table_init();
@@ -143,6 +160,7 @@ int create(char *name,type nodeType,int inode_index[]){
 	strcpy(name_copy, name);             
 	split_parent_child_from_path(name_copy, &parent_name, &child_name);
 	parent_inumber = lookup(parent_name,inode_index,i,0);
+	
 	child_inumber = inode_create(nodeType);
 	
 
@@ -150,7 +168,7 @@ int create(char *name,type nodeType,int inode_index[]){
 
 	strcpy(parent_copy, parent_name);  
 	split_parent_child_from_path(parent_copy,&parent_name_parent,&parent_name_child);
-	strcpy(new_path,name);
+	
 	
 	if (strlen(parent_name)==0){
 		pthread_rwlock_wrlock(&inode_table[FS_ROOT].lock);
@@ -164,10 +182,9 @@ int create(char *name,type nodeType,int inode_index[]){
 				if(parent_inumber==0){		 
 					pthread_rwlock_unlock(&inode_table[FS_ROOT].lock);
 
-					pthread_rwlock_unlock(&inode_table[child_inumber].lock);
 					}
 				else{
-					puts("maybe");
+					
 					strcpy(new_path,name);
 					char *path = strtok_r(new_path, delim,&saveptr);
 					while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
@@ -185,15 +202,12 @@ int create(char *name,type nodeType,int inode_index[]){
 				
 		return FAIL;
 	}
-	//pthread_rwlock_wrlock(&inode_table[parent_inumber].lock);	
-	//pthread_rwlock_wrlock(&inode_table[child_inumber].lock);
 	inode_get(parent_inumber, &pType, &pdata);
 	if(pType != T_DIRECTORY) {
 		printf("failed to create %s, parent %s is not a dir\n",
 		        name, parent_name);
 				 if(parent_inumber==0){
 					 pthread_rwlock_unlock(&inode_table[child_inumber].lock);
-					pthread_rwlock_unlock(&inode_table[parent_inumber].lock);
 					}
 				else{
 					
@@ -218,10 +232,9 @@ int create(char *name,type nodeType,int inode_index[]){
 		       child_name, parent_name);
 				if(parent_inumber==0){
 					pthread_rwlock_unlock(&inode_table[parent_inumber].lock);
-					pthread_rwlock_unlock(&inode_table[child_inumber].lock);
 					}
 				else{
-					puts("maybe");
+					
 					strcpy(unlock_path,name);
 					char *path = strtok_r(unlock_path, delim,&saveptr);
 					while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
@@ -246,10 +259,10 @@ int create(char *name,type nodeType,int inode_index[]){
 		        child_name, parent_name);
 				if(parent_inumber==0){
 					pthread_rwlock_unlock(&inode_table[parent_inumber].lock);
-					pthread_rwlock_unlock(&inode_table[child_inumber].lock);
+					
 					}
 				else{
-					puts("maybe");
+					
 					strcpy(unlock_path,name);
 					char *path = strtok_r(unlock_path, delim,&saveptr);
 					while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
@@ -272,10 +285,9 @@ int create(char *name,type nodeType,int inode_index[]){
 		       child_name, parent_name);
 				if(parent_inumber==0){
 					pthread_rwlock_unlock(&inode_table[parent_inumber].lock);
-					pthread_rwlock_unlock(&inode_table[child_inumber].lock);
 					}
 				else{
-					puts("maybe");
+					
 					strcpy(unlock_path,name);
 					char *path = strtok_r(unlock_path, delim,&saveptr);
 					while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
@@ -296,9 +308,8 @@ int create(char *name,type nodeType,int inode_index[]){
 
 	}	
 		if(parent_inumber==0){
-			//puts("finally");
+	
 			pthread_rwlock_unlock(&inode_table[FS_ROOT].lock);
-			pthread_rwlock_unlock(&inode_table[child_inumber].lock);
 			return SUCCESS;
 			}
 		else{
@@ -308,10 +319,8 @@ int create(char *name,type nodeType,int inode_index[]){
 						printf("path=%s",path);
 						for(i=0;i<INODE_TABLE_SIZE;i++){
 							if (inode_index[i]==current_inumber){
-								printf("inode=%d",inode_index[i]);
 								pthread_rwlock_unlock(&inode_table[i].lock);
 								inode_index[i]=-1;
-								break;
 							}
 						}
 						inode_get(current_inumber, &nType, &data);
@@ -321,6 +330,7 @@ int create(char *name,type nodeType,int inode_index[]){
 
 }
 	}
+
   
 /*
  * Deletes a node given a path.
@@ -346,7 +356,6 @@ int delete(char *name,int inode_index []){
 
 	split_parent_child_from_path(name_copy, &parent_name, &child_name);
 	parent_inumber = lookup(parent_name,inode_index,i,0);
-	pthread_rwlock_trywrlock(&inode_table[parent_inumber].lock);
 	
 	strcpy(parent_copy, parent_name);  
 	split_parent_child_from_path(parent_copy,&parent_name_parent,&parent_name_child);
@@ -354,14 +363,11 @@ int delete(char *name,int inode_index []){
 	inode_get(parent_inumber, &pType, &pdata);
 	child_inumber = lookup_sub_node(child_name, pdata.dirEntries);
 
-
 	if (parent_inumber == FAIL) {
 		printf("failed to delete %s, invalid parent dir %s\n",
 		        child_name, parent_name);
 					if(parent_inumber==0){		 
 					pthread_rwlock_unlock(&inode_table[FS_ROOT].lock);
-
-					pthread_rwlock_unlock(&inode_table[child_inumber].lock);
 					}
 				else{
 					strcpy(unlock_path, name);
@@ -369,10 +375,9 @@ int delete(char *name,int inode_index []){
 					pthread_rwlock_unlock(&inode_table[parent_inumber].lock);
 					char *path = strtok_r(unlock_path, delim,&saveptr);
 					while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
+						pthread_rwlock_unlock(&inode_table[current_inumber].lock);
 						for(i=0;i<INODE_TABLE_SIZE;i++){
 							if (inode_index[i]==current_inumber){
-								printf("inode=%d",inode_index[i]);
-								pthread_rwlock_unlock(&inode_table[i].lock);
 								inode_index[i]=-1;
 								break;
 							}
@@ -383,7 +388,6 @@ int delete(char *name,int inode_index []){
 					}
 					return FAIL;
 					}
-	pthread_rwlock_trywrlock(&inode_table[child_inumber].lock);	
 
 
 	inode_get(parent_inumber, &pType, &pdata);
@@ -393,8 +397,6 @@ int delete(char *name,int inode_index []){
 		        child_name, parent_name);
 				if(parent_inumber==0){		 
 					pthread_rwlock_unlock(&inode_table[FS_ROOT].lock);
-
-					pthread_rwlock_unlock(&inode_table[child_inumber].lock);
 					}
 				else{
 					
@@ -402,10 +404,9 @@ int delete(char *name,int inode_index []){
 					
 					char *path = strtok_r(unlock_path, delim,&saveptr);
 					while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
+						pthread_rwlock_unlock(&inode_table[current_inumber].lock);
 						for(i=0;i<INODE_TABLE_SIZE;i++){
 							if (inode_index[i]==current_inumber){
-								printf("inode=%d",inode_index[i]);
-								pthread_rwlock_unlock(&inode_table[i].lock);
 								inode_index[i]=-1;
 								break;
 							}
@@ -418,13 +419,11 @@ int delete(char *name,int inode_index []){
 	}
 
 	if (child_inumber == FAIL) {
-		puts(name);
+		
 		printf("could not delete %s, does not exist in dir %s\n",
 		       name, parent_name);
 			   if(parent_inumber==0){		 
 					pthread_rwlock_unlock(&inode_table[FS_ROOT].lock);
-
-					pthread_rwlock_unlock(&inode_table[child_inumber].lock);
 					}
 				else{
 					
@@ -433,10 +432,9 @@ int delete(char *name,int inode_index []){
 					
 					char *path = strtok_r(unlock_path, delim,&saveptr);
 					while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
+						pthread_rwlock_unlock(&inode_table[current_inumber].lock);
 						for(i=0;i<INODE_TABLE_SIZE;i++){
 							if (inode_index[i]==current_inumber){
-								printf("inode=%d",inode_index[i]);
-								pthread_rwlock_unlock(&inode_table[i].lock);
 								inode_index[i]=-1;
 								break;
 							}
@@ -457,7 +455,6 @@ int delete(char *name,int inode_index []){
 			   if(parent_inumber==0){		 
 					pthread_rwlock_unlock(&inode_table[FS_ROOT].lock);
 
-					pthread_rwlock_unlock(&inode_table[child_inumber].lock);
 					}
 				else{
 					
@@ -465,10 +462,9 @@ int delete(char *name,int inode_index []){
 					
 					char *path = strtok_r(unlock_path, delim,&saveptr);
 					while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
+						pthread_rwlock_unlock(&inode_table[current_inumber].lock);
 						for(i=0;i<INODE_TABLE_SIZE;i++){
 							if (inode_index[i]==current_inumber){
-								printf("inode=%d",inode_index[i]);
-								pthread_rwlock_unlock(&inode_table[i].lock);
 								inode_index[i]=-1;
 								break;
 							}
@@ -487,7 +483,6 @@ int delete(char *name,int inode_index []){
 			   if(parent_inumber==0){		 
 					pthread_rwlock_unlock(&inode_table[FS_ROOT].lock);
 
-					pthread_rwlock_unlock(&inode_table[child_inumber].lock);
 					}
 				else{
 					
@@ -495,10 +490,9 @@ int delete(char *name,int inode_index []){
 					
 					char *path = strtok_r(unlock_path, delim,&saveptr);
 					while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
+						pthread_rwlock_unlock(&inode_table[current_inumber].lock);
 						for(i=0;i<INODE_TABLE_SIZE;i++){
 							if (inode_index[i]==current_inumber){
-								printf("inode=%d",inode_index[i]);
-								pthread_rwlock_unlock(&inode_table[i].lock);
 								inode_index[i]=-1;
 								break;
 							}
@@ -515,18 +509,15 @@ int delete(char *name,int inode_index []){
 		       child_inumber, parent_name);
 			   if(parent_inumber==0){		 
 					pthread_rwlock_unlock(&inode_table[FS_ROOT].lock);
-
-					pthread_rwlock_unlock(&inode_table[child_inumber].lock);
 					}
 				else{
 					
 					strcpy(unlock_path, name);
 					char *path = strtok_r(unlock_path, delim,&saveptr);
 					while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
+						pthread_rwlock_unlock(&inode_table[current_inumber].lock);
 						for(i=0;i<INODE_TABLE_SIZE;i++){
 							if (inode_index[i]==current_inumber){
-								printf("inode=%d",inode_index[i]);
-								pthread_rwlock_unlock(&inode_table[i].lock);
 								inode_index[i]=-1;
 								break;
 							}
@@ -541,17 +532,15 @@ int delete(char *name,int inode_index []){
 	if(parent_inumber==0){		 
 					pthread_rwlock_unlock(&inode_table[FS_ROOT].lock);
 
-					pthread_rwlock_unlock(&inode_table[child_inumber].lock);
 					}
 				else{
 					
 					strcpy(unlock_path, name);
 					char *path = strtok_r(unlock_path, delim,&saveptr);
 					while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
+						pthread_rwlock_unlock(&inode_table[current_inumber].lock);
 						for(i=0;i<INODE_TABLE_SIZE;i++){
-							if (inode_index[i]==current_inumber){
-								printf("good delete inode=%d",inode_index[i]);
-								pthread_rwlock_unlock(&inode_table[i].lock);
+							if (inode_index[i]==current_inumber){								
 								inode_index[i]=-1;
 								break;
 							}
@@ -562,14 +551,7 @@ int delete(char *name,int inode_index []){
 					}
 	return SUCCESS;
 }
-void unlock_nodes(inode_t* inode_table,int max,int inode_index[]){
-	int j,k;
-	for(j=max;j<0;j--){
-		k=inode_index[j];
-		pthread_rwlock_unlock(&inode_table[k].lock);
-		inode_index[j]=-1;
-	}
-}
+
 
 
 /*
@@ -582,83 +564,64 @@ void unlock_nodes(inode_t* inode_table,int max,int inode_index[]){
  */
 
 int lookup(char *name,int inode_index[],int i,int is_read) {   // alterar a variavel i       
-	char full_path[MAX_FILE_NAME],*parent,*child;                             // passar o vetor como referencia
-	char delim[] = "/",*saveptr;
-	int k,j,l,is_active=0,unlocked=1;
+	char full_path[MAX_FILE_NAME],*parent,*child,newname[MAX_FILE_NAME],newpath[MAX_FILE_NAME];                             // passar o vetor como referencia
+	char delim[] = "/",*saveptr,*saveread;
+	int unlocked=1;
 	strcpy(full_path, name);
 	/* start at root node */
-	int current_inumber = FS_ROOT,helper=0;
+	int current_inumber = FS_ROOT,read_number=0;
 	/* use for copy */
 	type nType;
 	union Data data;
 	/* get root inode data */
 	inode_get(current_inumber, &nType, &data);
-	//printf("number=%d\n",current_inumber);
 	/* search for all sub nodes */
-	//pthread_rwlock_rdlock(&inode_table[current_inumber].lock);
-	if (strlen(name)==0){
-		return FS_ROOT;
-	}
-	if (strlen(name)==1){
-		current_inumber = lookup_sub_node(name, data.dirEntries);
-		return current_inumber;
-	}
-	split_parent_child_from_path(name,&parent,&child);
+	strcpy(newname,name);
+	split_parent_child_from_path(newname,&parent,&child);
 	char *path = strtok_r(full_path, delim,&saveptr);
-	printf("path=%s\n",path);
 	while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
-		//printf("child=%s\n",child);
 		if(strcmp(path,child)==0){
-			for(int j=0;j<INODE_TABLE_SIZE;j++){
-				if(inode_index[j]==current_inumber){
-					unlocked=0;
-					break;
-				}
+			pthread_rwlock_wrlock(&inode_table[current_inumber].lock);
+		}
+		for(int i=0;i<INODE_TABLE_SIZE;i++){
+			if(inode_index[i]==current_inumber){
+				unlocked=0;
+				break;
 			}
-		if((unlocked==1)&&(is_read==0)){
-			is_active=1;
-			pthread_rwlock_trywrlock(&inode_table[current_inumber].lock);
-			for(int i=0;i<INODE_TABLE_SIZE;i++){
-				if (inode_index[i]==-1){
-					inode_index[i]=current_inumber;
-					break;
-					}
-				}
-			break;
+			unlocked=2;
 		}
-		else if ((unlocked==1)&&(is_read==1)){
-			is_active=1;
-			
-			pthread_rwlock_tryrdlock(&inode_table[current_inumber].lock);
-			for(int i=0;i<INODE_TABLE_SIZE;i++){
-				if (inode_index[i]==-1){
-					inode_index[i]=current_inumber;
-					break;
-					}
-				}
-			helper++;
-			break;
-		}
-		else if(unlocked==0){
-			break;
+		if(unlocked==2)
+		{	
+			pthread_rwlock_rdlock(&inode_table[current_inumber].lock);
+			}
+		for(int i=0;i<INODE_TABLE_SIZE;i++){
+			if (inode_index[i]==-1){
+				inode_index[i]=current_inumber;
 			}
 		}
-			
 		inode_get(current_inumber, &nType, &data);
 		path = strtok_r(NULL, delim,&saveptr);
 	}
-	l=i;
-		while((helper-->0)&&(is_active==1)&&(is_read==1)) {
-		k=i--;
-		j=inode_index[k];
-		if(j>0){	
-		pthread_rwlock_unlock(&inode_table[j].lock);
-		inode_index[k]=-1;		
+	if ((is_read!=1)||(strlen(parent)==0)){
+		return current_inumber;
+	}
+
+	strcpy(newpath,name);
+	char *read_path = strtok_r(newpath, delim,&saveread);
+	while (read_path != NULL && (read_number = lookup_sub_node(read_path, data.dirEntries)) != FAIL) {
+		inode_get(read_number, &nType, &data);
+		read_path = strtok_r(NULL, delim,&saveread);
+		for(int i=0;i<INODE_TABLE_SIZE;i++){
+			if(inode_index[i]==read_number){
+				pthread_rwlock_unlock(&inode_table[i].lock);
 			}
 		}
-		i=l;
-	return current_inumber;	
+	}
+
+	return read_number;	
 }
+
+
 
 /*
  * Prints tecnicofs tree.

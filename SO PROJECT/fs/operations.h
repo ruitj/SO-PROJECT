@@ -1,7 +1,15 @@
 #ifndef FS_H
 #define FS_H
 #include "state.h"
-
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <stdlib.h>
+#include <strings.h>
+#include <sys/uio.h>
+#include <unistd.h>
+#include <sys/stat.h>
+int setSockAddrUn(char *path, struct sockaddr_un *addr);
 void init_fs();
 void destroy_fs();
 int is_dir_empty(DirEntry *dirEntries);

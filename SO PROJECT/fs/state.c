@@ -23,11 +23,10 @@ void insert_delay(int cycles) {
 void inode_table_init() {
     for (int i = 0; i < INODE_TABLE_SIZE; i++) {
         pthread_rwlock_init(&inode_table[i].lock,NULL);
-        pthread_rwlock_wrlock(&inode_table[i].lock);
+        
         inode_table[i].nodeType = T_NONE;
         inode_table[i].data.dirEntries = NULL;
         inode_table[i].data.fileContents = NULL;
-        pthread_rwlock_unlock(&inode_table[i].lock);
     }
 }
 
@@ -76,7 +75,7 @@ int inode_create(type nType) {
             pthread_rwlock_unlock(&inode_table[inumber].lock);
             return inumber;
         }
-        
+       pthread_rwlock_unlock(&inode_table[inumber].lock); 
     }
 
     return FAIL;
@@ -100,10 +99,9 @@ int inode_delete(int inumber) {
 
     inode_table[inumber].nodeType = T_NONE;
     /* see inode_table_destroy function */
-    pthread_rwlock_trywrlock(&inode_table[inumber].lock);
+    
     if (inode_table[inumber].data.dirEntries)
         free(inode_table[inumber].data.dirEntries);
-    pthread_rwlock_unlock(&inode_table[inumber].lock);
     return SUCCESS;
 }
 
@@ -165,15 +163,15 @@ int dir_reset_entry(int inumber, int sub_inumber) {
 
     
     for (int i = 0; i < MAX_DIR_ENTRIES; i++) {
-        pthread_rwlock_trywrlock(&inode_table[inumber].lock);
+        
         if (inode_table[inumber].data.dirEntries[i].inumber == sub_inumber) {
             inode_table[inumber].data.dirEntries[i].inumber = FREE_INODE;
             inode_table[inumber].data.dirEntries[i].name[0] = '\0';
-            pthread_rwlock_unlock(&inode_table[inumber].lock);
+            
             return SUCCESS;
         }
     }
-    pthread_rwlock_unlock(&inode_table[inumber].lock);
+
     return FAIL;
 }
 
