@@ -1,0 +1,7 @@
+c a d
+c c d
+c c/y/ d
+c c/y/h f
+c a/b f
+m a/b c/y/b 
+p tree.txt
