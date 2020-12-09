@@ -1,0 +1,36 @@
+*** auto-tests/A-18-14-M-ok.out	2020-11-26 14:09:33.360000000 +0000
+--- auto-tests/A-18-14-M-ok.outhyp	2020-12-08 02:03:49.041796412 +0000
+***************
+*** 110,116 ****
+  4 - Activa/desactivar notificações de um produto
+  5 - Mostrar transacções do cliente
+  0 - Sair
+! Escolha uma opção: Identificador do cliente: R2|Jorge Figueiredo|Lisboa, Portugal|SELECTION|3000|2060
+  Gestão de Clientes
+  1 - Mostrar cliente
+  2 - Mostrar clientes
+--- 110,116 ----
+  4 - Activa/desactivar notificações de um produto
+  5 - Mostrar transacções do cliente
+  0 - Sair
+! Escolha uma opção: Identificador do cliente: R2|Jorge Figueiredo|Lisboa, Portugal|SELECTION|3000|2140
+  Gestão de Clientes
+  1 - Mostrar cliente
+  2 - Mostrar clientes
+***************
+*** 161,167 ****
+  4 - Activa/desactivar notificações de um produto
+  5 - Mostrar transacções do cliente
+  0 - Sair
+! Escolha uma opção: Identificador do cliente: R2|Jorge Figueiredo|Lisboa, Portugal|ELITE|3000|2820
+  Gestão de Clientes
+  1 - Mostrar cliente
+  2 - Mostrar clientes
+--- 161,167 ----
+  4 - Activa/desactivar notificações de um produto
+  5 - Mostrar transacções do cliente
+  0 - Sair
+! Escolha uma opção: Identificador do cliente: R2|Jorge Figueiredo|Lisboa, Portugal|ELITE|3000|2940
+  Gestão de Clientes
+  1 - Mostrar cliente
+  2 - Mostrar clientes
